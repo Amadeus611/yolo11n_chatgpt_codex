@@ -1,0 +1,16 @@
+# EVD4UAV 数据集配置。训练前请确认 path 指向当前机器上的真实数据集根目录。
+
+path: /home/ssssss/1yolo/Dataset/EVD4UAV
+
+# 训练集和验证集的图片目录 (相对于上面的 path 路径)
+train: images/train
+val: images/val
+
+# 类别数量
+nc: 3
+
+# 类别名称映射 (严格对应我们刚才清洗时确定的 0, 1, 2)
+names:
+  0: car
+  1: bus
+  2: truck
