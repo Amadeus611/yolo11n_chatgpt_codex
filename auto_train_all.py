@@ -30,11 +30,11 @@ def main():
             "name": "Exp02_SCSP_DRCF",
             "sndq": False,
         },
-        {
-            "yaml": "ultralytics/cfg/models/11/yolo11n-scsp-drcf.yaml",
-            "name": "Exp03_SCSP_DRCF_SNDQ",
-            "sndq": True,
-        },
+        # {
+        #     "yaml": "ultralytics/cfg/models/11/yolo11n-scsp-drcf.yaml",
+        #     "name": "Exp03_SCSP_DRCF_SNDQ",
+        #     "sndq": True,
+        # },
 
         # =====================================================
         # Table 2: LiteNeck 速度消融
@@ -57,11 +57,11 @@ def main():
         # =====================================================
         # Table 4: 强基线对比
         # =====================================================
-        {
-            "yaml": "ultralytics/cfg/models/26/yolo26n.yaml",
-            "name": "Exp06_YOLO26n",
-            "sndq": False,
-        },
+        # {
+        #     "yaml": "ultralytics/cfg/models/26/yolo26n.yaml",
+        #     "name": "Exp06_YOLO26n",
+        #     "sndq": False,
+        # },
         # {
         #     "yaml": "ultralytics/cfg/models/rt-detr/rtdetr-l.yaml",
         #     "name": "Exp07_RTDETR_l",

@@ -207,3 +207,11 @@ results.csv
 # CI test asset cache
 .ultralytics_cache/
 .mplconfig/
+
+# Training logs
+args.yaml
+results.csv
+# Claude Code
+.claude/
+jiangong.py
+Ablation_Results*
