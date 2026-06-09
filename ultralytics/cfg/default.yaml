@@ -109,6 +109,7 @@ sndq_tau: 32.0 # (float) SNDQ 中 IoU/NWD 混合的目标尺度温度
 sndq_c: 12.8 # (float) SNDQ 中 NWD 相似度的归一化常数
 sndq_kappa: 64.0 # (float) SNDQ 中近邻距离权重的温度系数
 sndq_margin: 0.0 # (float) 触发 SNDQ 近邻惩罚前的 IoU 间隔
+sndq_mode: replace # (str) SNDQ 模式，replace 为旧版替代损失，aux 为 CIoU 主损失加弱辅助项
 pose: 12.0 # (float) pose loss gain (pose tasks)
 kobj: 1.0 # (float) keypoint objectness loss gain (pose tasks)
 rle: 1.0 # (float) rle loss gain (pose tasks)

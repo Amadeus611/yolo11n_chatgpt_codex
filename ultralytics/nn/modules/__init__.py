@@ -60,6 +60,7 @@ from .block import (
     ResNetLayer,
     SCDown,
     SCSPDRCF,
+    SCSPDRCFv2,
     DySample,
     TorchVision,
 )
@@ -181,6 +182,7 @@ __all__ = (
     "ResNetLayer",
     "SCDown",
     "SCSPDRCF",
+    "SCSPDRCFv2",
     "DySample",
     "Segment",
     "Segment26",

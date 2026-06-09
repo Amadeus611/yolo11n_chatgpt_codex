@@ -67,6 +67,7 @@ from ultralytics.nn.modules import (
     RTDETRDecoder,
     SCDown,
     SCSPDRCF,
+    SCSPDRCFv2,
     Segment,
     Segment26,
     SemanticSegment,
@@ -1819,7 +1820,7 @@ def parse_model(d, ch, verbose=True):
             args = [c1, c2, *args[1:]]
         elif m is CBFuse:
             c2 = ch[f[-1]]
-        elif m is SCSPDRCF:
+        elif m in frozenset({SCSPDRCF, SCSPDRCFv2}):
             c2 = ch[f[-1]]
             args = [[ch[x] for x in f], *args]
         elif m is DySample:

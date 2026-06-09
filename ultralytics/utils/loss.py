@@ -119,6 +119,7 @@ class BboxLoss(nn.Module):
         sndq_c: float = 12.8,
         sndq_kappa: float = 64.0,
         sndq_margin: float = 0.0,
+        sndq_mode: str = "replace",
     ):
         """初始化框损失模块，保留 DFL，并可选启用 SNDQ。"""
         super().__init__()
@@ -129,6 +130,7 @@ class BboxLoss(nn.Module):
         self.sndq_c = sndq_c
         self.sndq_kappa = sndq_kappa
         self.sndq_margin = sndq_margin
+        self.sndq_mode = str(sndq_mode).lower()
 
     @staticmethod
     def _box_wasserstein_distance(box1: torch.Tensor, box2: torch.Tensor) -> torch.Tensor:
@@ -208,6 +210,34 @@ class BboxLoss(nn.Module):
             penalty = torch.zeros_like(quality)
         return 1 - quality + penalty
 
+    def _sndq_aux_loss(
+        self,
+        pred_bboxes: torch.Tensor,
+        target_bboxes: torch.Tensor,
+        neighbor_bboxes: torch.Tensor,
+        stride: torch.Tensor,
+    ) -> torch.Tensor:
+        """计算 SNDQ v2 弱辅助项，主框损失仍由 CIoU 负责。"""
+        stride = stride.expand_as(pred_bboxes[..., :1])
+        pred_px = pred_bboxes * stride
+        target_px = target_bboxes * stride
+        neighbor_valid = neighbor_bboxes.sum(-1, keepdim=True).gt(0)
+
+        nwd = torch.exp(-self._box_wasserstein_distance(pred_px, target_px) / self.sndq_c).clamp(0, 1)
+        target_wh = xyxy2xywh(target_px)[..., 2:].clamp(min=1e-9)
+        small_weight = torch.exp(-torch.sqrt(target_wh.prod(-1, keepdim=True)) / self.sndq_tau).clamp(0, 1)
+        aux = small_weight * (1 - nwd)
+
+        if neighbor_valid.any():
+            neighbor_px = neighbor_bboxes * stride
+            target_center = xyxy2xywh(target_px)[..., :2]
+            neighbor_center = xyxy2xywh(neighbor_px)[..., :2]
+            center_dist = (target_center - neighbor_center).norm(dim=-1, keepdim=True)
+            rho = torch.exp(-center_dist / self.sndq_kappa).masked_fill(~neighbor_valid, 0)
+            leak = bbox_iou(pred_px, neighbor_px, xywh=False).clamp(min=0)
+            aux = aux + rho * (leak - self.sndq_margin).clamp(min=0)
+        return self.sndq_gamma * aux
+
     def forward(
         self,
         pred_dist: torch.Tensor,
@@ -228,12 +258,21 @@ class BboxLoss(nn.Module):
         if self.use_sndq and target_gt_idx is not None and gt_labels is not None and gt_bboxes is not None:
             neighbor_bboxes = self._nearest_same_class_gt(target_gt_idx, gt_labels, gt_bboxes, fg_mask)
             stride_fg = stride.unsqueeze(0).expand(pred_bboxes.shape[0], -1, -1)[fg_mask]
-            loss_box = self._sndq_loss(
-                pred_bboxes[fg_mask],
-                target_bboxes[fg_mask],
-                neighbor_bboxes / stride_fg,
-                stride_fg,
-            )
+            if self.sndq_mode == "aux":
+                iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
+                loss_box = 1.0 - iou + self._sndq_aux_loss(
+                    pred_bboxes[fg_mask],
+                    target_bboxes[fg_mask],
+                    neighbor_bboxes / stride_fg,
+                    stride_fg,
+                )
+            else:
+                loss_box = self._sndq_loss(
+                    pred_bboxes[fg_mask],
+                    target_bboxes[fg_mask],
+                    neighbor_bboxes / stride_fg,
+                    stride_fg,
+                )
             loss_iou = (loss_box * weight).sum() / target_scores_sum
         else:
             iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
@@ -480,6 +519,7 @@ class v8DetectionLoss:
             sndq_c=float(getattr(h, "sndq_c", getattr(model, "yaml", {}).get("sndq_c", 12.8))),
             sndq_kappa=float(getattr(h, "sndq_kappa", getattr(model, "yaml", {}).get("sndq_kappa", 64.0))),
             sndq_margin=float(getattr(h, "sndq_margin", getattr(model, "yaml", {}).get("sndq_margin", 0.0))),
+            sndq_mode=str(getattr(h, "sndq_mode", getattr(model, "yaml", {}).get("sndq_mode", "replace"))),
         ).to(device)
         self.proj = torch.arange(m.reg_max, dtype=torch.float, device=device)
 

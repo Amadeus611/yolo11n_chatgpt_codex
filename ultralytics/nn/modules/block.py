@@ -53,6 +53,7 @@ __all__ = (
     "ResNetLayer",
     "SCDown",
     "SCSPDRCF",
+    "SCSPDRCFv2",
     "DySample",
     "TorchVision",
 )
@@ -1221,6 +1222,33 @@ class SCSPDRCF(nn.Module):
         detail = detail * (0.75 + 0.5 * gate)
         detail = F.interpolate(self.replay(detail), size=target.shape[2:], mode="bilinear", align_corners=False)
         return target + self.alpha * detail
+
+
+class SCSPDRCFv2(nn.Module):
+    """更轻量的语义校准浅层细节回放模块。"""
+
+    def __init__(self, ch: list[int], alpha: float = 0.1, hidden: int | None = None):
+        """初始化有界残差注入版本，alpha 被限制在 0 到 0.2。"""
+        super().__init__()
+        c_shallow, c_semantic, c_target = ch
+        hidden = hidden or max(min(c_target // 4, 64), 16)
+        alpha_ratio = min(max(float(alpha) / 0.2, 1e-4), 1 - 1e-4)
+        self.shallow_proj = nn.Sequential(Conv(c_shallow, hidden, 1, 1), DWConv(hidden, hidden, 3, 1))
+        self.semantic_proj = Conv(c_semantic, hidden, 1, 1)
+        self.gate = nn.Sequential(Conv(hidden * 2, hidden, 1, 1), nn.Conv2d(hidden, hidden, 1))
+        self.replay = Conv(hidden, c_target, 1, 1, act=False)
+        self.alpha_logit = nn.Parameter(torch.logit(torch.tensor(alpha_ratio)))
+
+    def forward(self, x: list[torch.Tensor]) -> torch.Tensor:
+        """将语义筛选后的浅层细节以有界弱残差注入 P3。"""
+        shallow, semantic, target = x
+        detail = self.shallow_proj(shallow)
+        semantic = F.interpolate(self.semantic_proj(semantic), size=detail.shape[2:], mode="nearest")
+        gate = torch.sigmoid(self.gate(torch.cat((detail, semantic), dim=1)))
+        detail = detail * (0.75 + 0.5 * gate)
+        detail = F.interpolate(self.replay(detail), size=target.shape[2:], mode="bilinear", align_corners=False)
+        alpha = 0.2 * torch.sigmoid(self.alpha_logit)
+        return target + alpha * detail
 
 
 class C3k(C3):
